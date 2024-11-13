@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strings"
 	"sync/atomic"
 )
 
@@ -60,8 +61,16 @@ func main() {
 			return
 		}
 
+		words := []string{"kerfuffle", "sharbert", "fornax", "Kerfuffle", "Sharbert", "Fornax", "KERFUFFLE", "SHARBERT", "FORNAX"}
+
+		for _, word := range words {
+			if strings.Contains(params.Body, word) {
+				params.Body = strings.Replace(params.Body, word, "****", -1)
+			}
+		}
+
 		w.WriteHeader(200)
-		resp := map[string]bool{"valid": true}
+		resp := map[string]string{"cleaned_body": params.Body}
 		jsonResp, _ := json.Marshal(resp)
 		w.Write(jsonResp)
 	})
