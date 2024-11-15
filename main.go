@@ -40,6 +40,8 @@ func main() {
 	server.HandleFunc("POST /admin/reset", cfg.resetAllUSers)
 	// server.HandleFunc("POST /api/validate_chirp", cfg.validate_chirp)
 	server.HandleFunc("POST /api/chirps", cfg.send_chirp)
+	server.HandleFunc("GET /api/chirps", cfg.get_chirps)
+	server.HandleFunc("GET /api/chirps/{id}", cfg.get_chirp_by_id)
 	server.HandleFunc("POST /api/users", cfg.createUserRequest)
 	var serverStruct = http.Server{
 		Handler: server,
