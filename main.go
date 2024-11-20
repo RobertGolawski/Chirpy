@@ -43,6 +43,7 @@ func main() {
 	server.HandleFunc("GET /api/chirps", cfg.get_chirps)
 	server.HandleFunc("GET /api/chirps/{id}", cfg.get_chirp_by_id)
 	server.HandleFunc("POST /api/users", cfg.createUserRequest)
+	server.HandleFunc("POST /api/login", cfg.logInRequest)
 	var serverStruct = http.Server{
 		Handler: server,
 		Addr:    ":8080",
