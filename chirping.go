@@ -3,10 +3,12 @@ package main
 import (
 	"encoding/json"
 	"errors"
+	"log"
 	"net/http"
 	"strings"
 	"time"
 
+	"github.com/RobertGolawski/Chirpy/internal/auth"
 	"github.com/RobertGolawski/Chirpy/internal/database"
 	"github.com/google/uuid"
 )
@@ -91,6 +93,7 @@ func (cfg *apiConfig) send_chirp(w http.ResponseWriter, r *http.Request) {
 	type parameters struct {
 		Body    string        `json:"body"`
 		User_id uuid.NullUUID `json:"user_id"`
+		Token   string        `json:"token"`
 	}
 
 	w.Header().Set("Content-Type", "application/json")
@@ -106,6 +109,15 @@ func (cfg *apiConfig) send_chirp(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	params.Token, err = auth.GetBearerToken(r.Header)
+	if err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		resp := map[string]string{"error": "Something went wrong during bearer token retrieval"}
+		jsonResp, _ := json.Marshal(resp)
+		w.Write(jsonResp)
+		return
+	}
+
 	validated, err := validate_chirp(params.Body)
 	if err != nil {
 		w.WriteHeader(http.StatusBadRequest)
@@ -115,9 +127,29 @@ func (cfg *apiConfig) send_chirp(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	userID, err := auth.ValidateJWT(params.Token, cfg.secret)
+	if err != nil {
+		w.WriteHeader(http.StatusUnauthorized)
+		log.Printf("error during validation: %v", err)
+		resp := map[string]string{"error": "Something went wrong jwt validation"}
+		jsonResp, _ := json.Marshal(resp)
+		w.Write(jsonResp)
+		return
+	}
+
+	// if userID != params.User_id.UUID {
+	// 	log.Printf("Error happened here with user id: %v but was expecting %v", userID.String(), params.User_id.UUID.String())
+	// 	w.WriteHeader(http.StatusUnauthorized)
+	// 	resp := map[string]string{"error": "Something went wrong jwt validation"}
+	// 	jsonResp, _ := json.Marshal(resp)
+	// 	w.Write(jsonResp)
+	// 	return
+	// }
+	nullID := uuid.NullUUID{UUID: userID, Valid: true}
 	c, err := cfg.queries.CreateChirp(r.Context(), database.CreateChirpParams{
 		Body:   validated,
-		UserID: params.User_id})
+		UserID: nullID})
+	//uuid.NullUUID{UUID: userID, Valid: true}
 
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
