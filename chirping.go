@@ -201,3 +201,63 @@ func validate_chirp(s string) (string, error) {
 
 	return strings.Join(words, " "), nil
 }
+
+func (cfg *apiConfig) deleteChirpByID(w http.ResponseWriter, r *http.Request) {
+	path := r.PathValue("chirpID")
+	parsedPath, err := uuid.Parse(path)
+	if err != nil {
+		w.WriteHeader(404)
+		resp := map[string]string{"error": "Something went wrong during parsing"}
+		jsonResp, _ := json.Marshal(resp)
+		w.Write(jsonResp)
+		return
+	}
+	bearerToken, err := auth.GetBearerToken(r.Header)
+	if err != nil {
+		log.Printf("Error getting bearer token: %v", err)
+		w.WriteHeader(http.StatusUnauthorized)
+		resp := map[string]string{"error": "Something went wrong with getting bearer token"}
+		jsonResp, _ := json.Marshal(resp)
+		w.Write(jsonResp)
+		return
+	}
+
+	userID, err := auth.ValidateJWT(bearerToken, cfg.secret)
+	if err != nil {
+		log.Printf("Error with validation of the JWT in user update: %v", err)
+		w.WriteHeader(http.StatusUnauthorized)
+		resp := map[string]string{"error": "Something went wrong with validating the jwt"}
+		jsonResp, _ := json.Marshal(resp)
+		w.Write(jsonResp)
+		return
+	}
+
+	c, err := cfg.queries.GetChirp(r.Context(), parsedPath)
+	if err != nil {
+		w.WriteHeader(404)
+		resp := map[string]string{"error": "Something went wrong during querying"}
+		jsonResp, _ := json.Marshal(resp)
+		w.Write(jsonResp)
+		return
+	}
+
+	if userID != c.UserID.UUID {
+		w.WriteHeader(http.StatusForbidden)
+		resp := map[string]string{"error": "Forbidden"}
+		jsonResp, _ := json.Marshal(resp)
+		w.Write(jsonResp)
+		return
+	}
+
+	err = cfg.queries.DeleteChirp(r.Context(), parsedPath)
+	if err != nil {
+		log.Fatalf("Error during database operation to delete chirp: %v", err)
+		w.WriteHeader(http.StatusForbidden)
+		resp := map[string]string{"error": "Error with deleting chirp"}
+		jsonResp, _ := json.Marshal(resp)
+		w.Write(jsonResp)
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
+}

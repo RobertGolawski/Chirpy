@@ -388,3 +388,99 @@ func (cfg *apiConfig) revokeRefreshToken(w http.ResponseWriter, r *http.Request)
 
 	w.WriteHeader(http.StatusNoContent)
 }
+
+func (cfg *apiConfig) updateUserDetails(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	bearerToken, err := auth.GetBearerToken(r.Header)
+	if err != nil {
+		log.Printf("Error getting bearer token: %v", err)
+		w.WriteHeader(http.StatusUnauthorized)
+		resp := map[string]string{"error": "Something went wrong with getting bearer token"}
+		jsonResp, _ := json.Marshal(resp)
+		w.Write(jsonResp)
+		return
+	}
+
+	userID, err := auth.ValidateJWT(bearerToken, cfg.secret)
+	if err != nil {
+		log.Printf("Error with validation of the JWT in user update: %v", err)
+		w.WriteHeader(http.StatusUnauthorized)
+		resp := map[string]string{"error": "Something went wrong with validating the jwt"}
+		jsonResp, _ := json.Marshal(resp)
+		w.Write(jsonResp)
+		return
+	}
+
+	decoder := json.NewDecoder(r.Body)
+	params := parameters{}
+	if err := decoder.Decode(&params); err != nil {
+		log.Printf("Error decoding JSON: %s", err)
+		w.WriteHeader(http.StatusBadRequest)
+		resp := map[string]string{"error": "Something went wrong with parsing JSON"}
+		jsonResp, _ := json.Marshal(resp)
+		w.Write(jsonResp)
+		return
+	}
+
+	err = cfg.queries.UpdateEmail(r.Context(), database.UpdateEmailParams{Email: params.Email, ID: userID})
+	if err != nil {
+		log.Printf("Error updating email: %s", err)
+		w.WriteHeader(http.StatusBadRequest)
+		resp := map[string]string{"error": "Something went wrong during email update"}
+		jsonResp, _ := json.Marshal(resp)
+		w.Write(jsonResp)
+		return
+	}
+
+	hp, err := auth.HashPassword(params.Password)
+	if err != nil {
+		log.Printf("Error creating the hash: %s", err)
+		w.WriteHeader(http.StatusBadRequest)
+		resp := map[string]string{"error": "Something went wrong with hashing"}
+		jsonResp, _ := json.Marshal(resp)
+		w.Write(jsonResp)
+		return
+	}
+
+	if err := cfg.queries.UpdatePassword(r.Context(), database.UpdatePasswordParams{
+		HashedPassword: hp,
+		ID:             userID,
+	}); err != nil {
+		log.Printf("Error updating the user: %s", err)
+		w.WriteHeader(http.StatusBadRequest)
+		resp := map[string]string{"error": "Something went wrong with updating password"}
+		jsonResp, _ := json.Marshal(resp)
+		w.Write(jsonResp)
+		return
+	}
+
+	u, err := cfg.queries.GetUserByEmail(r.Context(), params.Email)
+	if err != nil {
+		log.Printf("Error fetching user by email: %s", err)
+		w.WriteHeader(http.StatusBadRequest)
+		resp := map[string]string{"error": "Something went wrong with fetching by email"}
+		jsonResp, _ := json.Marshal(resp)
+		w.Write(jsonResp)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+	resp := userResponse{
+		ID:        u.ID.String(),
+		CreatedAt: u.CreatedAt,
+		UpdatedAt: u.UpdatedAt,
+		Email:     u.Email,
+	}
+
+	jsonResp, err := json.Marshal(resp)
+	if err != nil {
+		log.Printf("Error marshalling: %s", err)
+		w.WriteHeader(http.StatusBadRequest)
+		resp := map[string]string{"error": "Something went wrong with response creation"}
+		jsonResp, _ := json.Marshal(resp)
+		w.Write(jsonResp)
+		return
+	}
+	w.Write(jsonResp)
+
+}
