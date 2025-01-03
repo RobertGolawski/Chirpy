@@ -22,8 +22,19 @@ type chirpResponse struct {
 }
 
 func (cfg *apiConfig) get_chirps(w http.ResponseWriter, r *http.Request) {
+	s := r.URL.Query().Get("author_id")
+	if s != "" {
+		cfg.get_chirps_for_user(w, r)
+		return
+	}
+	order := "asc"
+	o := r.URL.Query().Get("sort")
+	if o == "desc" {
+		order = "desc"
+	}
+
 	w.Header().Set("Content-Type", "application/json")
-	cs, err := cfg.queries.GetChirps(r.Context())
+	cs, err := cfg.queries.GetChirps(r.Context(), order)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		resp := map[string]string{"error": "Something went wrong during retrieval"}
@@ -260,4 +271,57 @@ func (cfg *apiConfig) deleteChirpByID(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.WriteHeader(http.StatusNoContent)
+}
+
+func (cfg *apiConfig) get_chirps_for_user(w http.ResponseWriter, r *http.Request) {
+	order := "asc"
+	o := r.URL.Query().Get("sort")
+	if o == "desc" {
+		order = "desc"
+	}
+	s := r.URL.Query().Get("author_id")
+	parsedPath, err := uuid.Parse(s)
+	if err != nil {
+		w.WriteHeader(404)
+		resp := map[string]string{"error": "Something went wrong during parsing"}
+		jsonResp, _ := json.Marshal(resp)
+		w.Write(jsonResp)
+		return
+	}
+
+	nullID := uuid.NullUUID{UUID: parsedPath, Valid: true}
+
+	w.Header().Set("Content-Type", "application/json")
+	cs, err := cfg.queries.GetUserChirps(r.Context(), database.GetUserChirpsParams{UserID: nullID, SortOrder: order})
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		resp := map[string]string{"error": "Something went wrong during retrieval"}
+		jsonResp, _ := json.Marshal(resp)
+		w.Write(jsonResp)
+		return
+	}
+
+	var chirps []chirpResponse
+
+	for _, c := range cs {
+		chirps = append(chirps, chirpResponse{
+			ID:        c.ID.String(),
+			CreatedAt: c.CreatedAt,
+			UpdatedAt: c.UpdatedAt,
+			Body:      c.Body,
+			UserID:    c.UserID.UUID.String(),
+		})
+	}
+
+	jsonResp, err := json.Marshal(chirps)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		resp := map[string]string{"error": "Something went wrong during response generation"}
+		jsonResp, _ := json.Marshal(resp)
+		w.Write(jsonResp)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+	w.Write(jsonResp)
 }

@@ -47,6 +47,7 @@ func main() {
 	server.HandleFunc("POST /api/chirps", cfg.send_chirp)
 	server.HandleFunc("GET /api/chirps", cfg.get_chirps)
 	server.HandleFunc("GET /api/chirps/{id}", cfg.get_chirp_by_id)
+	// server.HandleFunc("GET /api/chirps/{author_id}", cfg.get_chirps_for_user)
 	server.HandleFunc("POST /api/users", cfg.createUserRequest)
 	server.HandleFunc("POST /api/login", cfg.logInRequest)
 	server.HandleFunc("POST /api/refresh", cfg.refreshJWT)
