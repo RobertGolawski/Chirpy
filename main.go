@@ -17,6 +17,7 @@ type apiConfig struct {
 	queries        *database.Queries
 	platform       string
 	secret         string
+	api            string
 }
 
 func main() {
@@ -29,8 +30,10 @@ func main() {
 		return
 	}
 	s := os.Getenv("SECRET")
+	a := os.Getenv("POLKA_KEY")
 	var cfg apiConfig
 	cfg.platform = p
+	cfg.api = a
 	dbQueries := database.New(db)
 	cfg.queries = dbQueries
 	cfg.secret = s

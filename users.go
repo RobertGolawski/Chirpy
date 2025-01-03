@@ -515,7 +515,26 @@ func (cfg *apiConfig) upgradeUserToRed(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err := cfg.queries.UpgradeToRed(r.Context(), params.Data.UserID)
+	k, err := auth.GetAPIKey(r.Header)
+	if err != nil {
+		log.Printf("Error validating api key %s", err)
+		w.WriteHeader(http.StatusUnauthorized)
+		resp := map[string]string{"error": "error with api key"}
+		jsonResp, _ := json.Marshal(resp)
+		w.Write(jsonResp)
+		return
+	}
+
+	if k != cfg.api {
+		log.Printf("Error validating api key, %s did not match", k)
+		w.WriteHeader(http.StatusUnauthorized)
+		resp := map[string]string{"error": "error with api key"}
+		jsonResp, _ := json.Marshal(resp)
+		w.Write(jsonResp)
+		return
+	}
+
+	err = cfg.queries.UpgradeToRed(r.Context(), params.Data.UserID)
 	if err != nil {
 		log.Printf("Error upgrading to red: %s", err)
 		w.WriteHeader(http.StatusNotFound)
