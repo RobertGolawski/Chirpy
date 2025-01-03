@@ -18,6 +18,7 @@ type userResponse struct {
 	Email        string    `json:"email"`
 	Token        string    `json:"token"`
 	RefreshToken string    `json:"refresh_token"`
+	IsRed        bool      `json:"is_chirpy_red"`
 }
 
 type parameters struct {
@@ -132,6 +133,7 @@ func (cfg *apiConfig) createUserRequest(w http.ResponseWriter, r *http.Request) 
 		Email:        u.Email,
 		Token:        tokenString,
 		RefreshToken: refreshToken,
+		IsRed:        u.IsChirpyRed,
 	}
 	jsonResp, err := json.Marshal(resp)
 	if err != nil {
@@ -239,6 +241,7 @@ func (cfg *apiConfig) logInRequest(w http.ResponseWriter, r *http.Request) {
 		Email:        u.Email,
 		Token:        tokenString,
 		RefreshToken: refreshToken,
+		IsRed:        u.IsChirpyRed,
 	}
 
 	jsonResp, err := json.Marshal(resp)
@@ -470,6 +473,7 @@ func (cfg *apiConfig) updateUserDetails(w http.ResponseWriter, r *http.Request) 
 		CreatedAt: u.CreatedAt,
 		UpdatedAt: u.UpdatedAt,
 		Email:     u.Email,
+		IsRed:     u.IsChirpyRed,
 	}
 
 	jsonResp, err := json.Marshal(resp)
@@ -483,4 +487,43 @@ func (cfg *apiConfig) updateUserDetails(w http.ResponseWriter, r *http.Request) 
 	}
 	w.Write(jsonResp)
 
+}
+
+func (cfg *apiConfig) upgradeUserToRed(w http.ResponseWriter, r *http.Request) {
+	type requestData struct {
+		UserID uuid.UUID `json:"user_id"`
+	}
+	type upgradeRequest struct {
+		Event string      `json:"event"`
+		Data  requestData `json:"data"`
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	decoder := json.NewDecoder(r.Body)
+	params := upgradeRequest{}
+	if err := decoder.Decode(&params); err != nil {
+		log.Printf("Error decoding JSON: %s", err)
+		w.WriteHeader(http.StatusBadRequest)
+		resp := map[string]string{"error": "Something went wrong with parsing JSON"}
+		jsonResp, _ := json.Marshal(resp)
+		w.Write(jsonResp)
+		return
+	}
+
+	if params.Event != "user.upgraded" {
+		w.WriteHeader(204)
+		return
+	}
+
+	err := cfg.queries.UpgradeToRed(r.Context(), params.Data.UserID)
+	if err != nil {
+		log.Printf("Error upgrading to red: %s", err)
+		w.WriteHeader(http.StatusNotFound)
+		resp := map[string]string{"error": "Something went wrong with upgrading to red"}
+		jsonResp, _ := json.Marshal(resp)
+		w.Write(jsonResp)
+		return
+	}
+
+	w.WriteHeader(204)
 }

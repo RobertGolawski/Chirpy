@@ -50,6 +50,7 @@ func main() {
 	server.HandleFunc("POST /api/revoke", cfg.revokeRefreshToken)
 	server.HandleFunc("PUT /api/users", cfg.updateUserDetails)
 	server.HandleFunc("DELETE /api/chirps/{chirpID}", cfg.deleteChirpByID)
+	server.HandleFunc("POST /api/polka/webhooks", cfg.upgradeUserToRed)
 	var serverStruct = http.Server{
 		Handler: server,
 		Addr:    ":8080",
